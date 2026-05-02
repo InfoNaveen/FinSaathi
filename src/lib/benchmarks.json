@@ -1,0 +1,42 @@
+{
+  "processing_fee": {
+    "min": 0,
+    "max": 2.0,
+    "unit": "percent",
+    "source": "RBI Fair Practices Code 2023",
+    "warning_above": 2.0
+  },
+  "foreclosure_penalty": {
+    "min": 0,
+    "max": 2.0,
+    "unit": "percent",
+    "source": "RBI Circular RBI/2023-24/55",
+    "warning_above": 2.0,
+    "note": "RBI banned foreclosure penalties on floating rate loans for individuals"
+  },
+  "penal_interest": {
+    "min": 0,
+    "max": 2.0,
+    "unit": "percent_per_month",
+    "source": "RBI Circular Aug 2023 - Penal Charges",
+    "warning_above": 2.0,
+    "note": "Penal interest cannot be compounded as per RBI Aug 2023 circular"
+  },
+  "lock_in_period": {
+    "min": 0,
+    "max": 12,
+    "unit": "months",
+    "source": "Industry standard",
+    "warning_above": 24
+  },
+  "insurance_bundling": {
+    "mandatory_allowed": false,
+    "source": "IRDAI Circular 2021 - Prohibition on bundling",
+    "note": "Any mandatory insurance bundling with loan is a violation"
+  },
+  "variable_rate": {
+    "warning": true,
+    "source": "RBI Fair Practices Code",
+    "note": "Borrower must be notified of rate changes in advance"
+  }
+}
