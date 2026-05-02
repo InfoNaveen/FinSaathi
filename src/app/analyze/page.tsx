@@ -14,7 +14,7 @@ import { ResultsFooter } from "@/components/ResultsFooter";
 import { Chatbot } from "@/components/Chatbot";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRiskFilter } from "@/hooks/useRiskFilter";
-import { RiskCardData } from "@/types";
+import { RiskCardData, Language, LANGUAGE_LABELS } from "@/types";
 export default function AnalyzePage() {
   const router = useRouter();
   const [data, setData] = useState<RiskCardData | null>(null);
@@ -39,6 +39,26 @@ export default function AnalyzePage() {
     data?.clauses || []
   );
 
+  const handleLanguageChange = async (newLang: Language) => {
+    switchLanguage(newLang);
+    if (!data || newLang === "EN" || newLang === "HI") return;
+    
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ riskCard: data, language: LANGUAGE_LABELS[newLang] })
+      });
+      if (res.ok) {
+        const translatedData = await res.json();
+        setData(translatedData);
+        sessionStorage.setItem("finsaathi-risk-card", JSON.stringify(translatedData));
+      }
+    } catch (e) {
+      console.error("Translation failed", e);
+    }
+  };
+
   if (!data) return null; // or a loading spinner
 
   return (
@@ -60,7 +80,7 @@ export default function AnalyzePage() {
           </div>
 
           <div className="shrink-0">
-            <LanguageToggle current={language} onChange={switchLanguage} />
+            <LanguageToggle current={language} onChange={handleLanguageChange} />
           </div>
         </div>
       </div>

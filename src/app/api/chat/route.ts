@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 You are FinSaathi's legal assistant - a knowledgeable, warm, plain-spoken guide for Indian borrowers.
 
 CONTEXT:
-- Document text (first 6000 chars): ${documentText}
+${riskCard ? `- Document text (first 6000 chars): ${documentText}
 - Risk Card verdict: ${riskCard.verdict}
 - Critical flags: ${riskCard.critical_count}
 - High flags: ${riskCard.high_count}
@@ -36,7 +36,7 @@ CONTEXT:
       risk: clause.risk_level,
       value: clause.extracted_value,
     }))
-  )}
+  )}` : `- No document has been uploaded yet.`}
 
 RULES:
 1. Respond in this language: ${language}

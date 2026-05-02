@@ -54,6 +54,7 @@ export interface RiskCardData {
   verdict: Verdict;
   verdict_reason_english: string;
   verdict_reason_hindi: string;
+  verdict_reason_vernacular?: string;
   clauses: ExplainedClause[];
   critical_count: number;
   high_count: number;

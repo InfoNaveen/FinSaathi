@@ -40,7 +40,11 @@ export function VerdictBanner({ data, language }: VerdictBannerProps) {
   const Icon = cfg.icon;
 
   const reason =
-    language === "EN" ? data.verdict_reason_english : data.verdict_reason_hindi;
+    language === "EN"
+      ? data.verdict_reason_english
+      : language === "HI"
+      ? data.verdict_reason_hindi
+      : data.verdict_reason_vernacular || data.verdict_reason_english;
 
   const { speak, stopSpeaking, isSpeaking } = useSpeech();
 
