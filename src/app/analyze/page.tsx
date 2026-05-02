@@ -2,8 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { FilterByRisk, DocumentInfo } from "@/components/Sidebar";
@@ -15,9 +14,11 @@ import { Chatbot } from "@/components/Chatbot";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRiskFilter } from "@/hooks/useRiskFilter";
 import { RiskCardData, Language, LANGUAGE_LABELS } from "@/types";
+
 export default function AnalyzePage() {
   const router = useRouter();
   const [data, setData] = useState<RiskCardData | null>(null);
+  const [translating, setTranslating] = useState(false);
   const { language, switchLanguage, transitioning } = useLanguage("EN");
 
   useEffect(() => {
@@ -33,33 +34,39 @@ export default function AnalyzePage() {
     }
   }, [router]);
 
-  // We initialize the hook, but it needs data.clauses.
-  // We use an empty array initially to avoid hook rule violations.
   const { activeFilters, toggle, selectAll, clearAll, filtered, counts } = useRiskFilter(
     data?.clauses || []
   );
 
   const handleLanguageChange = async (newLang: Language) => {
     switchLanguage(newLang);
+
+    // EN and HI are already available from the API response
     if (!data || newLang === "EN" || newLang === "HI") return;
-    
+
+    setTranslating(true);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ riskCard: data, language: LANGUAGE_LABELS[newLang] })
+        body: JSON.stringify({
+          riskCard: data,
+          language: LANGUAGE_LABELS[newLang],
+        }),
       });
       if (res.ok) {
-        const translatedData = await res.json();
+        const translatedData: RiskCardData = await res.json();
         setData(translatedData);
         sessionStorage.setItem("finsaathi-risk-card", JSON.stringify(translatedData));
       }
     } catch (e) {
       console.error("Translation failed", e);
+    } finally {
+      setTranslating(false);
     }
   };
 
-  if (!data) return null; // or a loading spinner
+  if (!data) return null;
 
   return (
     <div className="min-h-screen bg-navy">
@@ -75,11 +82,35 @@ export default function AnalyzePage() {
           </Link>
 
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Image src="/logo.png" alt="FinSaathi" width={100} height={28} className="object-contain" />
+            {/* Inline SVG logo lockup — matches Navbar */}
+            <div className="flex items-center gap-[6px]">
+              <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+                <path
+                  d="M14 2L4 6.5V13C4 18.5 8.5 23.6 14 25.5C19.5 23.6 24 18.5 24 13V6.5L14 2Z"
+                  fill="#F0A500"
+                  opacity="0.15"
+                  stroke="#F0A500"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M10 14L13 17L18 11"
+                  stroke="#F0A500"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="font-bold text-[15px] text-white tracking-[-0.02em]">
+                FinSaathi
+              </span>
+            </div>
             <span className="text-slate text-sm hidden sm:block">/ {data.document_type}</span>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
+            {translating && (
+              <Loader2 className="w-4 h-4 text-amber animate-spin" />
+            )}
             <LanguageToggle current={language} onChange={handleLanguageChange} />
           </div>
         </div>

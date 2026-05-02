@@ -87,27 +87,27 @@ function BenchmarkBar({
 function getExplanation(clause: ExplainedClause, language: Language): string {
   if (language === "EN") return clause.plain_english;
   if (language === "HI") return clause.plain_hindi;
-  return clause.plain_vernacular || clause.plain_english;
+  return clause.plain_vernacular || clause.plain_hindi || clause.plain_english;
 }
 
 export function ClauseCard({ clause, language, index }: ClauseCardProps) {
   const [rawExpanded, setRawExpanded] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
-  const [displayedText, setDisplayedText] = useState(() => getExplanation(clause, language));
   const { speak, stopSpeaking, isSpeaking } = useSpeech();
+
+  // Always derive displayedText from current props — no stale state
+  const displayedText = getExplanation(clause, language);
 
   const risk = clause.risk_level as RiskLevel;
   const borderColor = RISK_COLOR[risk];
   const showNegotiation = risk === "HIGH" || risk === "CRITICAL";
 
+  // Brief opacity flash on language change
   useEffect(() => {
     setTransitioning(true);
-    const t = setTimeout(() => {
-      setDisplayedText(getExplanation(clause, language));
-      setTransitioning(false);
-    }, 200);
+    const t = setTimeout(() => setTransitioning(false), 200);
     return () => clearTimeout(t);
-  }, [language, clause]);
+  }, [language]);
 
   const handleSpeak = () => {
     if (isSpeaking) {

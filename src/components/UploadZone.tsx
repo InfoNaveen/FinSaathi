@@ -265,6 +265,21 @@ export function UploadZone() {
         className="hidden"
         onChange={onInputChange}
       />
+
+      {/* Demo button for presentations */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          import("@/data/mock").then(({ MOCK_ANALYSIS }) => {
+            sessionStorage.setItem("finsaathi-risk-card", JSON.stringify(MOCK_ANALYSIS));
+            sessionStorage.setItem("finsaathi-document-text", "DEMO: Sample Home Loan Agreement with critical clauses identified by FinSaathi AI engine.");
+            router.push("/analyze");
+          });
+        }}
+        className="mt-4 w-full text-center py-2.5 bg-navy-mid border border-amber/30 text-amber text-sm font-medium rounded-card hover:bg-amber/10 transition-colors duration-200"
+      >
+        ⚡ Try Demo — Sample Home Loan Analysis
+      </button>
     </div>
   );
 }
