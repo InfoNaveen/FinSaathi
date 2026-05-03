@@ -24,7 +24,7 @@
 
 <br/>
 
-[**Live Demo**](https://finsaathi.vercel.app) · [**Deep Research Document**](https://drive.google.com/file/d/1QXkaElz6vx-CEdubT7fT5HEq9jVLs-Au/view?usp=drivesdk) · [**Report a Bug**](https://github.com/InfoNaveen/FinSaathi/issues)
+[**Live Demo**](https://finsaathi-three.vercel.app) · [**Deep Research Document**](https://drive.google.com/file/d/1QXkaElz6vx-CEdubT7fT5HEq9jVLs-Au/view?usp=drivesdk) · [**Report a Bug**](https://github.com/InfoNaveen/FinSaathi/issues)
 
 </div>
 
