@@ -37,6 +37,7 @@ const VERDICT_CONFIG = {
 
 export function VerdictBanner({ data, language }: VerdictBannerProps) {
   const cfg = VERDICT_CONFIG[data.verdict];
+  const Icon = cfg.icon;
   
   function getReason(data: RiskCardData, language: Language): string {
     if (language === "EN") return data.verdict_reason_english;
