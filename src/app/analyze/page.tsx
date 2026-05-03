@@ -28,6 +28,7 @@ export default function AnalyzePage() {
       return;
     }
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setData(JSON.parse(stored));
     } catch {
       router.push("/");

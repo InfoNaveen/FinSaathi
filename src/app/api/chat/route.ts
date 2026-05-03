@@ -16,7 +16,6 @@ function getOfflineResponse(message: string, riskCard?: RiskCardData): string {
   }
 
   const criticalClauses = riskCard.clauses.filter(c => c.risk_level === 'CRITICAL')
-  const highClauses = riskCard.clauses.filter(c => c.risk_level === 'HIGH')
 
   if (lowerMsg.includes('risky') || lowerMsg.includes('dangerous') || lowerMsg.includes('worst') || lowerMsg.includes('critical')) {
     if (criticalClauses.length > 0) {
@@ -80,7 +79,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const message = body.message as string
     const riskCard = body.riskCard as RiskCardData | undefined
-    const documentText = (body.documentText as string) || ''
     const language = (body.language as SupportedLanguage) || 'en'
     const history = (body.history as ChatHistoryMessage[]) || []
 

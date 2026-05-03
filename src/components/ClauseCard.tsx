@@ -86,8 +86,7 @@ function BenchmarkBar({
 
 function getExplanation(clause: ExplainedClause, language: Language): string {
   if (language === "EN") return clause.plain_english;
-  if (language === "HI") return clause.plain_hindi;
-  return clause.plain_vernacular || clause.plain_hindi || clause.plain_english;
+  return clause.plain_vernacular ?? clause.plain_hindi ?? clause.plain_english;
 }
 
 export function ClauseCard({ clause, language, index }: ClauseCardProps) {
@@ -104,6 +103,7 @@ export function ClauseCard({ clause, language, index }: ClauseCardProps) {
 
   // Brief opacity flash on language change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTransitioning(true);
     const t = setTimeout(() => setTransitioning(false), 200);
     return () => clearTimeout(t);

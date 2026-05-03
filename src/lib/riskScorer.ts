@@ -1,5 +1,5 @@
 import benchmarks from './benchmarks.json'
-import type { ClauseType, ExtractedClause, RiskLevel, ScoredClause, Verdict } from '@/types'
+import type { ClauseType, ExtractedClause, RiskLevel, ScoredClause } from '@/types'
 
 type NumericBenchmark = {
   max: number

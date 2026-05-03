@@ -6,7 +6,6 @@ import {
   FileText,
   AlertCircle,
   CheckCircle,
-  Loader2,
 } from "lucide-react";
 import { LOADING_MESSAGES } from "@/data/mock";
 

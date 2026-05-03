@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 export function useSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
   const speak = useCallback((text: string, lang = "en-IN") => {
@@ -25,13 +26,16 @@ export function useSpeech() {
 
   const startListening = useCallback((onResult: (text: string) => void) => {
     const SR =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).SpeechRecognition ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).webkitSpeechRecognition;
     if (!SR) return;
     const recognition = new SR();
     recognition.lang = "en-IN";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (e: any) => {
       const transcript = e.results[0][0].transcript;
       onResult(transcript);

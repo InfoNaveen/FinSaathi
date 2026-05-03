@@ -106,7 +106,7 @@ export function Chatbot({ data }: ChatbotProps) {
         escalated: result.escalate || shouldEscalate(text), // Check client side just in case
       };
       setMessages((prev) => [...prev, assistantMsg]);
-    } catch (err) {
+    } catch {
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",

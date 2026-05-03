@@ -20,42 +20,55 @@ DOCUMENT TEXT:
 ${documentText}`
 }
 
+const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
+  en: 'English',
+  hi: 'Hindi using Devanagari script',
+  kn: 'Kannada using Kannada script',
+  ta: 'Tamil using Tamil script',
+  te: 'Telugu using Telugu script',
+  mr: 'Marathi using Devanagari script',
+  gu: 'Gujarati using Gujarati script',
+}
+
 export function buildExplanationPrompt(scoredClauses: ScoredClause[], languageParam: SupportedLanguage = 'hi') {
-  return `You are a financial literacy expert explaining Indian loan documents to first-generation borrowers with no financial background.
+  const targetLanguage = LANGUAGE_INSTRUCTIONS[languageParam] ?? LANGUAGE_INSTRUCTIONS['hi']
 
-Provide a final verdict for the document as one of these strings EXACTLY:
-"SAFE" (if no major risks are found)
-"REVIEW" (if there are HIGH risks but no CRITICAL risks)
-"RISKY" (if there are 1 or more CRITICAL risks)
+  return `CRITICAL LANGUAGE INSTRUCTION — THIS OVERRIDES EVERYTHING:
+You MUST generate plain_vernacular in ${targetLanguage}.
+Do NOT use English or Hindi for plain_vernacular unless the target IS English or Hindi.
+Use the correct native script. Class 8 reading level vocabulary.
+verdict_reason_vernacular MUST also be in ${targetLanguage}.
 
-Given these flagged clauses from a financial document, generate plain language explanations.
+For plain_english: always English. For plain_hindi: always Hindi Devanagari.
+For plain_vernacular: MUST be ${targetLanguage}.
 
-For each clause, provide:
-- plain_english: one sentence explanation (max 30 words, no jargon, Class 8 level)
-- plain_vernacular: same explanation in the target language below
-- negotiation_tip: one actionable tip to negotiate or avoid this clause (null if LOW risk)
+You are a financial literacy expert explaining Indian loan documents to first-generation borrowers.
 
-Generate plain_vernacular as the field name (replacing plain_hindi).
-The target language is: ${languageParam} — use the full native script for that language.
-If language is 'en', plain_vernacular = same as plain_english.
-All languages must use Class 8 reading level vocabulary.
+For each clause provide:
+- plain_english: one sentence (max 30 words, no jargon)
+- plain_hindi: same in Hindi Devanagari
+- plain_vernacular: same in ${targetLanguage}
+- negotiation_tip: actionable tip in ${targetLanguage} (null if LOW risk)
 
 Also generate:
-- document_type: what type of document this is ("Personal Loan", "Home Loan", "Credit Card Agreement", "Insurance Policy", etc.)
-- verdict_reason_english: 2 sentences explaining the overall verdict
-- verdict_reason_hindi: same in Hindi (Devanagari)
+- document_type: "Personal Loan", "Home Loan", etc.
+- verdict_reason_english: 2 sentences in English
+- verdict_reason_hindi: same in Hindi Devanagari
+- verdict_reason_vernacular: same in ${targetLanguage}
 
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON:
 {
   "document_type": "...",
   "verdict_reason_english": "...",
   "verdict_reason_hindi": "...",
+  "verdict_reason_vernacular": "... in ${targetLanguage} ...",
   "clauses": [
     {
       "clause_type": "...",
       "plain_english": "...",
-      "plain_vernacular": "...",
-      "negotiation_tip": "..." or null
+      "plain_hindi": "...",
+      "plain_vernacular": "... in ${targetLanguage} ...",
+      "negotiation_tip": "..."
     }
   ]
 }

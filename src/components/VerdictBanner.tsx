@@ -37,14 +37,13 @@ const VERDICT_CONFIG = {
 
 export function VerdictBanner({ data, language }: VerdictBannerProps) {
   const cfg = VERDICT_CONFIG[data.verdict];
-  const Icon = cfg.icon;
+  
+  function getReason(data: RiskCardData, language: Language): string {
+    if (language === "EN") return data.verdict_reason_english;
+    return data.verdict_reason_vernacular ?? data.verdict_reason_hindi ?? data.verdict_reason_english;
+  }
 
-  const reason =
-    language === "EN"
-      ? data.verdict_reason_english
-      : language === "HI"
-      ? data.verdict_reason_hindi
-      : data.verdict_reason_vernacular || data.verdict_reason_english;
+  const reason = getReason(data, language);
 
   const { speak, stopSpeaking, isSpeaking } = useSpeech();
 

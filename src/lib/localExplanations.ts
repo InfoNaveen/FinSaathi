@@ -1,132 +1,217 @@
-import type { ClauseType, ExplainedClause, RiskCardData, ScoredClause, Verdict } from '@/types'
+import type { ExplainedClause, RiskCardData, ScoredClause } from '@/types'
 import { computeVerdict } from './riskScorer'
 
-const clauseLabels: Record<ClauseType, string> = {
-  processing_fee: 'Processing Fee',
-  foreclosure_penalty: 'Foreclosure Penalty',
-  penal_interest: 'Penal Interest',
-  lock_in_period: 'Lock-in Period',
-  auto_renewal: 'Auto-renewal Clause',
-  arbitration_clause: 'Arbitration Clause',
-  insurance_bundling: 'Insurance Bundling',
-  variable_rate: 'Variable Rate Clause',
-  cross_default: 'Cross-default Clause',
-  lien_on_account: 'Lien on Account',
-  unknown: 'Unknown Clause'
+const VERDICT_REASONS: Record<string, Record<string, string>> = {
+  DO_NOT_SIGN: {
+    en: 'This document contains serious violations of RBI and IRDAI guidelines. Do not sign without legal advice.',
+    hi: 'इस दस्तावेज़ में RBI और IRDAI दिशानिर्देशों का गंभीर उल्लंघन है। कानूनी सलाह के बिना हस्ताक्षर न करें।',
+    kn: 'ಈ ದಾಖಲೆಯಲ್ಲಿ RBI ಮತ್ತು IRDAI ಮಾರ್ಗಸೂಚಿಗಳ ಗಂಭೀರ ಉಲ್ಲಂಘನೆಗಳಿವೆ. ಕಾನೂನು ಸಲಹೆಯಿಲ್ಲದೆ ಸಹಿ ಹಾಕಬೇಡಿ.',
+    ta: 'இந்த ஆவணத்தில் RBI மற்றும் IRDAI வழிகாட்டுதல்களின் தீவிர மீறல்கள் உள்ளன. சட்ட ஆலோசனை இல்லாமல் கையொப்பமிடாதீர்கள்.',
+    te: 'ఈ పత్రంలో RBI మరియు IRDAI మార్గదర్శకాల తీవ్రమైన ఉల్లంఘనలు ఉన్నాయి. న్యాయ సలహా లేకుండా సంతకం చేయవద్దు.',
+    mr: 'या दस्तऐवजात RBI आणि IRDAI मार्गदर्शक तत्त्वांचे गंभीर उल्लंघन आहे. कायदेशीर सल्ल्याशिवाय सही करू नका.',
+    gu: 'આ દસ્તાવેજમાં RBI અને IRDAI માર્ગદર્શિકાઓનું ગંભીર ઉલ્લંઘન છે. કાનૂની સલાહ વિના સહી કરશો નહીં.',
+  },
+  SIGN_WITH_CAUTION: {
+    en: 'This document has some clauses above RBI benchmarks. Review all flagged items before signing.',
+    hi: 'इस दस्तावेज़ में कुछ खंड RBI मानकों से अधिक हैं। हस्ताक्षर करने से पहले सभी चिह्नित मदों की समीक्षा करें।',
+    kn: 'ಈ ದಾಖಲೆಯಲ್ಲಿ ಕೆಲವು ಷರತ್ತುಗಳು RBI ಮಾನದಂಡಗಳಿಗಿಂತ ಹೆಚ್ಚಾಗಿವೆ. ಸಹಿ ಹಾಕುವ ಮೊದಲು ಎಲ್ಲಾ ಗುರುತಿಸಿದ ಅಂಶಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.',
+    ta: 'இந்த ஆவணத்தில் சில நிபந்தனைகள் RBI தரநிலைகளை மீறுகின்றன. கையொப்பமிடுவதற்கு முன் அனைத்து குறிப்பிட்ட விஷயங்களையும் ஆராயுங்கள்.',
+    te: 'ఈ పత్రంలో కొన్ని నిబంధనలు RBI ప్రమాణాలకు మించి ఉన్నాయి. సంతకం చేయడానికి ముందు అన్ని గుర్తించిన అంశాలను సమీక్షించండి.',
+    mr: 'या दस्तऐवजातील काही कलमे RBI मानकांपेक्षा जास्त आहेत. सही करण्यापूर्वी सर्व चिन्हांकित बाबी तपासा.',
+    gu: 'આ દસ્તાવેજમાં કેટલીક કલમો RBI બેન્ચમાર્ક્સથી વધુ છે. સહી કરતા પહેલા તમામ ચિહ્નિત મુદ્દાઓની સમીક્ષા કરો.',
+  },
+  SIGN: {
+    en: 'This document appears to be within RBI guidelines. No major violations detected.',
+    hi: 'यह दस्तावेज़ RBI दिशानिर्देशों के अनुसार प्रतीत होता है। कोई बड़ा उल्लंघन नहीं मिला।',
+    kn: 'ಈ ದಾಖಲೆಯು RBI ಮಾರ್ಗಸೂಚಿಗಳ ಅನ್ವಯ ಕಾಣುತ್ತದೆ. ಯಾವುದೇ ದೊಡ್ಡ ಉಲ್ಲಂಘನೆಗಳು ಕಂಡುಬಂದಿಲ್ಲ.',
+    ta: 'இந்த ஆவணம் RBI வழிகாட்டுதல்களுக்கு உட்பட்டதாக தெரிகிறது. பெரிய மீறல்கள் எதுவும் கண்டறியப்படவில்லை.',
+    te: 'ఈ పత్రం RBI మార్గదర్శకాల ప్రకారం ఉన్నట్లు కనిపిస్తోంది. పెద్ద ఉల్లంఘనలేమీ గుర్తించబడలేదు.',
+    mr: 'हा दस्तऐवज RBI मार्गदर्शक तत्त्वांनुसार दिसतो. कोणतेही मोठे उल्लंघन आढळले नाही.',
+    gu: 'આ દસ્તાવેજ RBI માર્ગદર્શિકા અનુસાર જણાય છે. કોઈ મોટી ઉલ્લંઘના મળી નથી.',
+  },
 }
 
-const fallbackCopy: Record<
-  ClauseType,
-  { english: string; hindi: string; tip: string | null }
-> = {
+const CLAUSE_EXPLANATIONS: Record<string, Record<string, string>> = {
   processing_fee: {
-    english: 'You pay this fee before or during loan disbursal.',
-    hindi: 'यह शुल्क loan मिलने से पहले या loan मिलते समय देना पड़ता है।',
-    tip: 'Ask for a written fee waiver or a lower processing charge.'
+    en: 'A one-time fee charged by the lender for processing your loan application.',
+    hi: 'ऋणदाता द्वारा आपके ऋण आवेदन को संसाधित करने के लिए एकमुश्त शुल्क।',
+    kn: 'ನಿಮ್ಮ ಸಾಲದ ಅರ್ಜಿಯನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲು ಸಾಲದಾತರು ವಿಧಿಸುವ ಒಂದು-ಬಾರಿ ಶುಲ್ಕ.',
+    ta: 'உங்கள் கடன் விண்ணப்பத்தை செயல்படுத்துவதற்காக கடன் வழங்குநர் வசூலிக்கும் ஒருமுறை கட்டணம்.',
+    te: 'మీ రుణ దరఖాస్తును ప్రాసెస్ చేయడానికి రుణదాత విధించే ఒక్కసారి రుసుము.',
+    mr: 'तुमचा कर्ज अर्ज प्रक्रिया करण्यासाठी कर्जदात्याने आकारलेले एकवेळ शुल्क.',
+    gu: 'તમારી લોન અરજી પ્રક્રિયા કરવા માટે ધિરાણકર્તા દ્વારા વસૂલવામાં આવતી એક-વખત ફી.',
   },
   foreclosure_penalty: {
-    english: 'You may pay extra money if you close the loan early.',
-    hindi: 'Loan जल्दी बंद करने पर आपको extra पैसा देना पड़ सकता है।',
-    tip: 'Ask the lender to remove or cap early closure charges.'
+    en: 'A penalty charged if you repay your loan before the agreed end date.',
+    hi: 'यदि आप सहमत तिथि से पहले अपना ऋण चुकाते हैं तो लगाया जाने वाला दंड।',
+    kn: 'ನೀವು ಒಪ್ಪಿದ ಅಂತಿಮ ದಿನಾಂಕಕ್ಕಿಂತ ಮೊದಲು ನಿಮ್ಮ ಸಾಲವನ್ನು ಮರುಪಾವತಿಸಿದರೆ ವಿಧಿಸಲಾಗುವ ದಂಡ.',
+    ta: 'நிர்ணயிக்கப்பட்ட தேதிக்கு முன்பே கடனை திருப்பிச் செலுத்தினால் விதிக்கப்படும் அபராதம்.',
+    te: 'అంగీకరించిన చివరి తేదీకి ముందే మీ రుణాన్ని చెల్లిస్తే విధించే జరిమానా.',
+    mr: 'मान्य केलेल्या अंतिम तारखेपूर्वी तुम्ही कर्ज परत केल्यास आकारला जाणारा दंड.',
+    gu: 'નક્કી કરેલ અંતિમ તારીખ પહેલા તમે લોન ચૂકવો તો વસૂલવામાં આવતો દંડ.',
   },
   penal_interest: {
-    english: 'Late EMI payments can create extra charges quickly.',
-    hindi: 'EMI देर होने पर extra charge जल्दी बढ़ सकता है।',
-    tip: 'Ask for a clear cap and no compounding on late charges.'
+    en: 'Extra interest charged on overdue EMI payments when you miss a payment.',
+    hi: 'भुगतान चूकने पर अतिदेय EMI भुगतान पर लगाया जाने वाला अतिरिक्त ब्याज।',
+    kn: 'ಪಾವತಿ ತಪ್ಪಿಸಿದಾಗ ಅತಿದೇಯ EMI ಪಾವತಿಗಳ ಮೇಲೆ ವಿಧಿಸಲಾಗುವ ಹೆಚ್ಚುವರಿ ಬಡ್ಡಿ.',
+    ta: 'தவறிய ஈஎம்ஐ செலுத்துதல்களில் விதிக்கப்படும் கூடுதல் வட்டி.',
+    te: 'చెల్లింపు మిస్ అయినప్పుడు గడువు మించిన EMI చెల్లింపులపై విధించే అదనపు వడ్డీ.',
+    mr: 'पेमेंट चुकल्यावर थकीत EMI वर आकारले जाणारे अतिरिक्त व्याज.',
+    gu: 'ચૂકી ગયેલી ચૂકવણી પર EMI ચૂકવણીઓ પર વસૂલવામાં આવતું વધારાનું વ્યાજ.',
   },
   lock_in_period: {
-    english: 'You cannot exit or close the product freely during this period.',
-    hindi: 'इस समय तक आप product को आसानी से बंद नहीं कर सकते।',
-    tip: 'Ask for a shorter lock-in or a no-penalty exit option.'
-  },
-  auto_renewal: {
-    english: 'This product may renew automatically unless you cancel it.',
-    hindi: 'अगर आप cancel नहीं करेंगे, तो यह product अपने आप renew हो सकता है।',
-    tip: 'Ask for renewal reminders and an easy cancellation process.'
-  },
-  arbitration_clause: {
-    english: 'Disputes may be settled at a location chosen by the lender.',
-    hindi: 'विवाद lender की चुनी हुई जगह पर सुलझाया जा सकता है।',
-    tip: 'Ask for a neutral dispute location near your city.'
+    en: 'A period during which you cannot repay or exit the loan early.',
+    hi: 'एक अवधि जिसके दौरान आप ऋण जल्दी नहीं चुका सकते या बाहर नहीं निकल सकते।',
+    kn: 'ಈ ಅವಧಿಯಲ್ಲಿ ನೀವು ಸಾಲವನ್ನು ಮೊದಲೇ ತೀರಿಸಲು ಅಥವಾ ನಿರ್ಗಮಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.',
+    ta: 'இந்த காலகட்டத்தில் நீங்கள் கடனை முன்கூட்டியே திருப்பி செலுத்தவோ வெளியேறவோ முடியாது.',
+    te: 'ఈ కాలంలో మీరు రుణాన్ని ముందుగా చెల్లించలేరు లేదా నిష్క్రమించలేరు.',
+    mr: 'या कालावधीत तुम्ही कर्ज लवकर परत करू शकत नाही किंवा बाहेर पडू शकत नाही.',
+    gu: 'આ સમયગાળા દરમિયાન તમે લોન વહેલી ચૂકવી શકતા નથી અથવા બહાર નીકળી શકતા નથી.',
   },
   insurance_bundling: {
-    english: 'The lender is making insurance compulsory with the loan.',
-    hindi: 'Lender loan के साथ insurance लेना compulsory बना रहा है।',
-    tip: 'Ask for written confirmation that insurance is optional.'
+    en: 'The lender is forcing you to buy insurance as a condition of the loan. This is illegal under IRDAI 2021.',
+    hi: 'ऋणदाता आपको ऋण की शर्त के रूप में बीमा खरीदने के लिए मजबूर कर रहा है। यह IRDAI 2021 के तहत अवैध है।',
+    kn: 'ಸಾಲದಾತರು ಸಾಲದ ಷರತ್ತಾಗಿ ವಿಮೆ ಖರೀದಿಸಲು ಒತ್ತಾಯಿಸುತ್ತಿದ್ದಾರೆ. ಇದು IRDAI 2021 ಅಡಿ ಅಕ್ರಮ.',
+    ta: 'கடன் வழங்குநர் கடன் நிபந்தனையாக காப்பீடு வாங்க கட்டாயப்படுத்துகிறார். இது IRDAI 2021 கீழ் சட்டவிரோதம்.',
+    te: 'రుణదాత రుణ షరతుగా బీమా కొనుగోలు చేయమని బలవంతం చేస్తున్నాడు. ఇది IRDAI 2021 కింద చట్టవిరుద్ధం.',
+    mr: 'कर्जदाता कर्जाची अट म्हणून विमा घेण्यास भाग पाडत आहे. हे IRDAI 2021 अंतर्गत बेकायदेशीर आहे.',
+    gu: 'ધિરાણકર્તા લોનની શરત તરીકે વીમો ખરીદવા દબાણ કરી રહ્યા છે. IRDAI 2021 હેઠળ આ ગેરકાયદેસર છે.',
   },
-  variable_rate: {
-    english: 'Your interest rate can change later.',
-    hindi: 'आपका ब्याज दर बाद में बदल सकता है।',
-    tip: 'Ask how much notice you will get before any rate change.'
+  arbitration_clause: {
+    en: 'Disputes must be settled in a specific city — even if you live far away.',
+    hi: 'विवादों का निपटारा एक विशिष्ट शहर में होना चाहिए — भले ही आप दूर रहते हों।',
+    kn: 'ವಿವಾದಗಳನ್ನು ನಿರ್ದಿಷ್ಟ ನಗರದಲ್ಲಿ ಇತ್ಯರ್ಥಗೊಳಿಸಬೇಕು — ನೀವು ದೂರದಲ್ಲಿ ವಾಸಿಸುತ್ತಿದ್ದರೂ ಸಹ.',
+    ta: 'சர்ச்சைகளை ஒரு குறிப்பிட்ட நகரத்தில் தீர்க்க வேண்டும் — நீங்கள் தொலைவில் வாழ்ந்தாலும்.',
+    te: 'వివాదాలు నిర్దిష్ట నగరంలో పరిష్కరించాలి — మీరు దూరంగా నివసిస్తున్నా సరే.',
+    mr: 'वाद एखाद्या विशिष्ट शहरात सोडवावे लागतात — तुम्ही दूर राहत असलो तरी.',
+    gu: 'વિવાદો ચોક્કસ શહેરમાં ઉકેલવા જોઈએ — ભલે તમે દૂર રહો.',
+  },
+  auto_renewal: {
+    en: 'This policy or plan renews automatically and charges you without asking.',
+    hi: 'यह पॉलिसी या योजना स्वचालित रूप से नवीनीकृत होती है और बिना पूछे आपसे शुल्क लेती है।',
+    kn: 'ಈ ಪಾಲಿಸಿ ಅಥವಾ ಯೋಜನೆ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಣಗೊಳ್ಳುತ್ತದೆ ಮತ್ತು ಕೇಳದೆ ನಿಮ್ಮಿಂದ ಶುಲ್ಕ ವಸೂಲಿ ಮಾಡುತ್ತದೆ.',
+    ta: 'இந்த பாலிசி தானாகவே புதுப்பிக்கப்படுகிறது மற்றும் கேட்காமல் உங்களிடம் கட்டணம் வசூலிக்கிறது.',
+    te: 'ఈ పాలసీ లేదా ప్లాన్ స్వయంచాలకంగా పునరుద్ధరించబడుతుంది మరియు అడగకుండా మీ నుండి రుసుము వసూలు చేస్తుంది.',
+    mr: 'ही पॉलिसी किंवा योजना आपोआप नूतनीकरण होते आणि न विचारता तुमच्याकडून शुल्क आकारते.',
+    gu: 'આ પૉલિસી અથવા પ્લાન આપોઆપ નવીકરણ થાય છે અને પૂછ્યા વિના તમારી પાસેથી ચાર્જ કરે છે.',
   },
   cross_default: {
-    english: 'Missing payment on one loan may affect your other loans too.',
-    hindi: 'एक loan की payment छूटने पर दूसरे loans पर भी असर पड़ सकता है।',
-    tip: 'Ask to remove cross-default language from the agreement.'
+    en: 'If you default on ANY other loan anywhere, this lender can immediately recall this loan too.',
+    hi: 'यदि आप कहीं भी किसी अन्य ऋण पर चूक करते हैं, तो यह ऋणदाता इस ऋण को भी तुरंत वापस बुला सकता है।',
+    kn: 'ನೀವು ಎಲ್ಲಿಯಾದರೂ ಯಾವುದೇ ಇತರ ಸಾಲದಲ್ಲಿ ತಪ್ಪಿದರೆ, ಈ ಸಾಲದಾತರು ಈ ಸಾಲವನ್ನೂ ತಕ್ಷಣ ವಾಪಸ್ ಪಡೆಯಬಹುದು.',
+    ta: 'வேறு எங்காவது வேறு எந்த கடனிலும் தவறினால், இந்த கடனையும் உடனடியாக திரும்பப் பெறலாம்.',
+    te: 'మీరు ఎక్కడైనా మరే ఇతర రుణంలో డిఫాల్ట్ అయినా, ఈ రుణదాత ఈ రుణాన్ని కూడా వెంటనే తిరిగి పిలుచుకోవచ్చు.',
+    mr: 'तुम्ही कुठेही इतर कोणत्याही कर्जावर डिफॉल्ट केल्यास, हा कर्जदाता हे कर्जही ताबडतोब परत मागू शकतो.',
+    gu: 'જો તમે ક્યાંય બીજી કોઈ લોનમાં ડિફોલ્ટ કરો, તો આ ધિરાણકર્તા આ લોન પણ તરત પાછી માગી શકે.',
   },
   lien_on_account: {
-    english: 'The bank may freeze or use money from your account.',
-    hindi: 'Bank आपके account का पैसा रोक या use कर सकता है।',
-    tip: 'Ask when the lien can be used and how it will be released.'
+    en: 'The lender can freeze and take money from your bank account without warning.',
+    hi: 'ऋणदाता बिना चेतावनी के आपके बैंक खाते को फ्रीज कर सकता है और पैसे ले सकता है।',
+    kn: 'ಸಾಲದಾತರು ಎಚ್ಚರಿಕೆಯಿಲ್ಲದೆ ನಿಮ್ಮ ಬ್ಯಾಂಕ್ ಖಾತೆಯನ್ನು ಫ್ರೀಜ್ ಮಾಡಬಹುದು ಮತ್ತು ಹಣ ತೆಗೆಯಬಹುದು.',
+    ta: 'எச்சரிக்கையின்றி உங்கள் வங்கி கணக்கை முடக்கி பணம் எடுக்க கடன் வழங்குநருக்கு உரிமை உள்ளது.',
+    te: 'హెచ్చరిక లేకుండా మీ బ్యాంక్ ఖాతాను ఫ్రీజ్ చేసి డబ్బు తీసుకోవడానికి రుణదాతకు హక్కు ఉంది.',
+    mr: 'कर्जदाता इशाऱ्याशिवाय तुमचे बँक खाते गोठवू शकतो आणि पैसे घेऊ शकतो.',
+    gu: 'ધિરાણકર્તા ચેતવણી વિના તમારો બેંક ખાતો ફ્રીઝ કરી નાણાં લઈ શકે.',
   },
-  unknown: {
-    english: 'This clause needs a closer review before you sign.',
-    hindi: 'Sign करने से पहले इस clause को ध्यान से review करना चाहिए।',
-    tip: 'Ask the lender to explain this clause in writing.'
-  }
+  variable_rate: {
+    en: 'The interest rate on your loan can be increased at any time by the lender.',
+    hi: 'ऋणदाता आपके ऋण की ब्याज दर किसी भी समय बढ़ा सकता है।',
+    kn: 'ಸಾಲದಾತರು ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ನಿಮ್ಮ ಸಾಲದ ಬಡ್ಡಿ ದರವನ್ನು ಹೆಚ್ಚಿಸಬಹುದು.',
+    ta: 'உங்கள் கடனின் வட்டி விகிதத்தை எந்த நேரத்திலும் கடன் வழங்குநர் அதிகரிக்கலாம்.',
+    te: 'మీ రుణంపై వడ్డీ రేటును రుణదాత ఎప్పుడైనా పెంచవచ్చు.',
+    mr: 'कर्जदाता तुमच्या कर्जावरील व्याजदर कधीही वाढवू शकतो.',
+    gu: 'ધિરાણકર્તા તમારી લોન પર ગમે ત્યારે વ્યાજ દર વધારી શકે.',
+  },
 }
 
-export function getClauseLabel(type: ClauseType) {
-  return clauseLabels[type] ?? 'Unknown Clause'
+const NEGOTIATION_TIPS: Record<string, Record<string, string>> = {
+  processing_fee: {
+    en: 'Ask the lender to reduce this to 1–1.5%. Industry standard is below 2% per RBI FPC 2023.',
+    hi: 'ऋणदाता से इसे 1-1.5% तक कम करने के लिए कहें। RBI FPC 2023 के अनुसार उद्योग मानक 2% से कम है।',
+    kn: 'ಇದನ್ನು 1-1.5%ಕ್ಕೆ ಇಳಿಸಲು ಸಾಲದಾತರನ್ನು ಕೇಳಿ. RBI FPC 2023 ಪ್ರಕಾರ ಉದ್ಯಮ ಮಾನದಂಡ 2%ಕ್ಕಿಂತ ಕಡಿಮೆ.',
+    ta: 'இதை 1-1.5%க்கு குறைக்க கோருங்கள். RBI FPC 2023 படி தொழில் தரநிலை 2%க்கு கீழே.',
+    te: 'దీన్ని 1-1.5%కు తగ్గించమని అడగండి. RBI FPC 2023 ప్రకారం పరిశ్రమ ప్రమాణం 2% కంటే తక్కువ.',
+    mr: 'हे 1-1.5% पर्यंत कमी करण्यास सांगा. RBI FPC 2023 नुसार उद्योग मानक 2% पेक्षा कमी आहे.',
+    gu: 'ધિરાણકર્તાને આ 1-1.5% પર ઘટાડવા કહો. RBI FPC 2023 મુજબ ઉદ્યોગ ધોરણ 2% થી ઓછું છે.',
+  },
+  foreclosure_penalty: {
+    en: 'Cite RBI Circular 2023-24/55. Demand the penalty be capped at 2% or waived after 12 months.',
+    hi: 'RBI सर्कुलर 2023-24/55 का हवाला दें। मांग करें कि दंड 2% तक सीमित हो या 12 महीने बाद माफ हो।',
+    kn: 'RBI ಸರ್ಕ್ಯುಲರ್ 2023-24/55 ಉಲ್ಲೇಖಿಸಿ. 12 ತಿಂಗಳ ನಂತರ ದಂಡವನ್ನು 2%ಕ್ಕೆ ಮಿತಿಗೊಳಿಸಲು ಅಥವಾ ಮನ್ನಾ ಮಾಡಲು ಒತ್ತಾಯಿಸಿ.',
+    ta: 'RBI சுற்றறிக்கை 2023-24/55 ஐ மேற்கோள் காட்டுங்கள். 12 மாதங்களுக்கு பிறகு அபராதம் 2%ஆக குறைக்கப்படல் அல்லது தள்ளுபடி செய்யப்படல் வேண்டும்.',
+    te: 'RBI సర్క్యులర్ 2023-24/55 ఉటంకించండి. 12 నెలల తర్వాత జరిమానాను 2%కు పరిమితం చేయమని లేదా మాఫీ చేయమని డిమాండ్ చేయండి.',
+    mr: 'RBI परिपत्रक 2023-24/55 उद्धृत करा. 12 महिन्यांनंतर दंड 2% वर मर्यादित किंवा माफ करण्याची मागणी करा.',
+    gu: 'RBI સર્ક્યુલર 2023-24/55 ટાંકો. 12 મહિના પછી દંડ 2% સુધી મર્યાદિત અથવા માફ કરવાની માંગ કરો.',
+  },
+  insurance_bundling: {
+    en: 'Refuse this. Cite IRDAI Circular 2021 which bans mandatory insurance bundling with loans.',
+    hi: 'इसे अस्वीकार करें। IRDAI सर्कुलर 2021 का हवाला दें जो ऋणों के साथ अनिवार्य बीमा बंडलिंग पर प्रतिबंध लगाता है।',
+    kn: 'ಇದನ್ನು ನಿರಾಕರಿಸಿ. IRDAI ಸರ್ಕ್ಯುಲರ್ 2021 ಉಲ್ಲೇಖಿಸಿ ಅದು ಸಾಲಗಳೊಂದಿಗೆ ಕಡ್ಡಾಯ ವಿಮಾ ಬಂಡ್ಲಿಂಗ್ ಅನ್ನು ನಿಷೇಧಿಸುತ್ತದೆ.',
+    ta: 'இதை மறுத்திடுங்கள். IRDAI சுற்றறிக்கை 2021 ஐ மேற்கோள் காட்டுங்கள், இது கடன்களுடன் கட்டாய காப்பீட்டை தடை செய்கிறது.',
+    te: 'దీన్ని నిరాకరించండి. IRDAI సర్క్యులర్ 2021 ఉటంకించండి, ఇది రుణాలతో తప్పనిసరి బీమా బండ్లింగ్ను నిషేధిస్తుంది.',
+    mr: 'हे नाकारा. IRDAI परिपत्रक 2021 उद्धृत करा जे कर्जांसह अनिवार्य विमा बंडलिंगवर बंदी घालते.',
+    gu: 'આ નકારો. IRDAI સર્ક્યુલર 2021 ટાંકો જે લોન સાથે ફરજિયાત વીમા બંડલિંગ પર પ્રતિબંધ મૂકે છે.',
+  },
+  penal_interest: {
+    en: 'Demand compounding be removed — RBI Aug 2023 circular bans compounding of penal interest.',
+    hi: 'कंपाउंडिंग हटाने की मांग करें — RBI अगस्त 2023 सर्कुलर दंड ब्याज की कंपाउंडिंग पर प्रतिबंध लगाता है।',
+    kn: 'ಕಾಂಪೌಂಡಿಂಗ್ ತೆಗೆದುಹಾಕಲು ಒತ್ತಾಯಿಸಿ — RBI ಅಗಸ್ಟ್ 2023 ಸರ್ಕ್ಯುಲರ್ ದಂಡ ಬಡ್ಡಿಯ ಕಾಂಪೌಂಡಿಂಗ್ ಅನ್ನು ನಿಷೇಧಿಸುತ್ತದೆ.',
+    ta: 'கூட்டு வட்டி நீக்கப்படவேண்டும் — RBI ஆகஸ்ட் 2023 சுற்றறிக்கை அபராத வட்டியின் கூட்டல் தடை செய்கிறது.',
+    te: 'కాంపౌండింగ్ తొలగించమని డిమాండ్ చేయండి — RBI ఆగష్టు 2023 సర్క్యులర్ పీనల్ వడ్డీ కాంపౌండింగ్ను నిషేధిస్తుంది.',
+    mr: 'कंपाउंडिंग काढण्याची मागणी करा — RBI ऑगस्ट 2023 परिपत्रक दंड व्याजाच्या कंपाउंडिंगवर बंदी घालते.',
+    gu: 'કમ્પાઉન્ડિંગ દૂર કરવાની માંગ કરો — RBI ઓગસ્ટ 2023 સર્ક્યુલર પ્રદૂષક વ્યાજના કમ્પાઉન્ડિંગ પર પ્રતિબંધ મૂકે છે.',
+  },
 }
 
 export function explainLocally(
   scoredClauses: ScoredClause[],
-  documentType = 'Financial Document'
+  documentType = 'Financial Document',
+  language: string = 'hi'
 ): RiskCardData {
   const { verdict, overall_risk } = computeVerdict(scoredClauses)
+  
   const clauses: ExplainedClause[] = scoredClauses.map((clause) => {
-    const copy = fallbackCopy[clause.clause_type] ?? fallbackCopy.unknown
+    const explanations = CLAUSE_EXPLANATIONS[clause.clause_type] || {
+      en: 'This clause needs a closer review before you sign.',
+      hi: 'Sign करने से पहले इस clause को ध्यान से review करना चाहिए।'
+    }
+    const tips = NEGOTIATION_TIPS[clause.clause_type] || {}
+    
+    const plain_english = explanations['en'] || explanations['hi'] || 'Review clause carefully.'
+    const plain_hindi = explanations['hi'] || plain_english
+    const plain_vernacular = explanations[language.toLowerCase()] || plain_hindi
+    
     const lowRisk = clause.risk_level === 'LOW'
+    const negotiation_tip = lowRisk ? null : (tips[language.toLowerCase()] || tips['en'] || tips['hi'] || null)
 
     return {
       ...clause,
-      plain_english: copy.english,
-      plain_hindi: copy.hindi,
-      plain_vernacular: copy.hindi,
-      negotiation_tip: lowRisk ? null : copy.tip
+      plain_english,
+      plain_hindi,
+      plain_vernacular,
+      negotiation_tip
     }
   })
+
+  let verdictKey = 'SIGN'
+  if (verdict === 'RISKY') verdictKey = 'DO_NOT_SIGN'
+  else if (verdict === 'REVIEW') verdictKey = 'SIGN_WITH_CAUTION'
+
+  const reasons = VERDICT_REASONS[verdictKey]
+  const verdict_reason_english = reasons['en'] || 'Review the document.'
+  const verdict_reason_hindi = reasons['hi'] || verdict_reason_english
+  const verdict_reason_vernacular = reasons[language.toLowerCase()] || verdict_reason_hindi
 
   return {
     document_type: documentType,
     overall_risk,
     verdict,
-    verdict_reason_english: verdictReason(verdict, 'english'),
-    verdict_reason_hindi: verdictReason(verdict, 'hindi'),
+    verdict_reason_english,
+    verdict_reason_hindi,
+    verdict_reason_vernacular,
     clauses,
     critical_count: scoredClauses.filter((c) => c.risk_level === 'CRITICAL').length,
     high_count: scoredClauses.filter((c) => c.risk_level === 'HIGH').length,
     analyzed_at: new Date().toISOString()
   }
-}
-
-function verdictReason(verdict: Verdict, language: 'english' | 'hindi') {
-  if (language === 'hindi') {
-    if (verdict === 'RISKY') {
-      return 'इस document में गंभीर risk मिले हैं। Sign करने से पहले lender से बदलाव मांगें या legal सलाह लें।'
-    }
-    if (verdict === 'REVIEW') {
-      return 'कुछ clauses आपके लिए नुकसानदेह हो सकते हैं। Negotiation tips को ध्यान से पढ़ें और lender से बात करें।'
-    }
-    return 'हमें कोई बड़ा risk नहीं मिला। आप इसे sign कर सकते हैं, लेकिन सभी clauses को एक बार पढ़ लें।'
-  }
-
-  if (verdict === 'RISKY') {
-    return 'Critical risks detected. Do not sign without negotiating changes or seeking legal advice.'
-  }
-  if (verdict === 'REVIEW') {
-    return 'Some clauses are risky or uncommon. Review the negotiation tips and clarify with the lender.'
-  }
-  return 'No major risks detected. It appears safe to sign, but please review all terms.'
 }

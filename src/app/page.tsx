@@ -60,7 +60,7 @@ export default function Home() {
               </div>
 
               <h1 className="font-display text-5xl lg:text-6xl text-off-white leading-tight mb-6 text-balance">
-                Know what you're
+                Know what you&apos;re
                 <br />
                 <span className="text-amber">signing</span> before
                 <br />

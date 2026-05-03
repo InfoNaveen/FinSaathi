@@ -13,6 +13,7 @@ type ExplanationResponse = {
   document_type: string
   verdict_reason_english: string
   verdict_reason_hindi: string
+  verdict_reason_vernacular?: string
   clauses: Array<{
     clause_type: string
     plain_english: string
@@ -55,15 +56,19 @@ export async function POST(request: Request) {
           modelJson.clauses[index]
 
         const plainEnglish = explanation?.plain_english ?? 'Review this clause carefully before signing.'
+        const plainHindi = explanation?.plain_hindi ?? 'Sign karne se pehle is clause ko dhyan se review karein.'
         const plainVernacular =
-          explanation?.plain_vernacular ??
-          explanation?.plain_hindi ??
-          (language === 'en' ? plainEnglish : 'Sign karne se pehle is clause ko dhyan se review karein.')
+          language === 'en'
+            ? plainEnglish
+            : explanation?.plain_vernacular && explanation.plain_vernacular !== explanation.plain_hindi
+            ? explanation.plain_vernacular
+            : explanation?.plain_hindi
+            ?? plainEnglish
 
         return {
           ...clause,
           plain_english: plainEnglish,
-          plain_hindi: explanation?.plain_hindi ?? plainVernacular,
+          plain_hindi: plainHindi,
           plain_vernacular: plainVernacular,
           negotiation_tip:
             clause.risk_level === 'LOW'
@@ -78,6 +83,7 @@ export async function POST(request: Request) {
         verdict,
         verdict_reason_english: modelJson.verdict_reason_english,
         verdict_reason_hindi: modelJson.verdict_reason_hindi,
+        verdict_reason_vernacular: modelJson.verdict_reason_vernacular ?? modelJson.verdict_reason_hindi,
         clauses: explainedClauses,
         critical_count: scoredClauses.filter((c) => c.risk_level === 'CRITICAL').length,
         high_count: scoredClauses.filter((c) => c.risk_level === 'HIGH').length,
@@ -87,7 +93,7 @@ export async function POST(request: Request) {
         fallback: body.fallback
       }
     } catch {
-      card = explainLocally(scoredClauses, body.document_type)
+      card = explainLocally(scoredClauses, body.document_type, language)
       card.suspicious = body.suspicious
       card.suspicious_flags = body.suspicious_flags
       card.fallback = body.fallback
